@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>搜工具 · GitHub 情报站</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 44px 20px 64px; background: #F7F6F3; color: #2C2C2A;
+    font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; line-height: 1.6; }
+  .wrap { max-width: 760px; margin: 0 auto; }
+  .top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 28px; }
+  .top a { font-size: 12px; color: #185FA5; text-decoration: none; }
+  .top a:hover { text-decoration: underline; }
+  h1 { font-size: 24px; font-weight: 500; margin: 0 0 6px; letter-spacing: -0.01em; }
+  .sub { font-size: 13px; color: #5F5E5A; margin-bottom: 22px; }
+  .searchbar { display: flex; gap: 8px; }
+  #q { flex: 1; font: inherit; font-size: 14px; padding: 13px 16px; border: 1px solid #D3D1C7;
+    border-radius: 10px; background: #fff; color: #2C2C2A; outline: none; }
+  #q:focus { border-color: #378ADD; }
+  #go { font: inherit; font-size: 14px; padding: 13px 22px; border: none; border-radius: 10px;
+    background: #2C2C2A; color: #fff; cursor: pointer; white-space: nowrap; }
+  #go:hover { background: #444441; }
+  #go:disabled { background: #B4B2A9; cursor: default; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 0; }
+  .chip { font: inherit; font-size: 12px; padding: 5px 11px; border: 1px solid #E3E1DA;
+    border-radius: 999px; background: #fff; color: #5F5E5A; cursor: pointer; }
+  .chip:hover { border-color: #B4B2A9; color: #2C2C2A; }
+  .opts { display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    margin: 20px 0 4px; font-size: 12px; color: #5F5E5A; }
+  .opts select { font: inherit; font-size: 12px; padding: 5px 8px; border: 1px solid #D3D1C7;
+    border-radius: 6px; background: #fff; color: #2C2C2A; }
+  .terms { font-size: 11px; color: #BA7517; margin: 14px 0 0; min-height: 17px; }
+  .status { font-size: 13px; color: #5F5E5A; margin: 18px 0; }
+  .status.err { color: #A32D2D; background: #FCEBEB; border-radius: 10px; padding: 12px 16px; }
+  .card { display: block; text-decoration: none; color: inherit; background: #fff;
+    border: 1px solid #E3E1DA; border-radius: 12px; padding: 16px 18px; margin-bottom: 10px; }
+  .card:hover { border-color: #B4B2A9; }
+  .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .name { font-size: 14px; font-weight: 500; color: #185FA5; word-break: break-all; }
+  .desc { font-size: 13px; color: #444441; margin: 6px 0 8px;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .dim { color: #B4B2A9; }
+  .meta { font-size: 12px; color: #888780; font-variant-numeric: tabular-nums; }
+  .tags { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .tag { font-size: 11px; color: #5F5E5A; background: #F1EFE8; border-radius: 4px; padding: 1px 6px; }
+  .bdg { font-size: 11px; border-radius: 4px; padding: 1px 6px; background: #FCEBEB; color: #A32D2D;
+    font-variant-numeric: tabular-nums; }
+  .empty { background: #fff; border: 1px dashed #D3D1C7; border-radius: 12px; padding: 28px;
+    text-align: center; color: #5F5E5A; font-size: 13px; }
+  footer { margin-top: 44px; padding-top: 20px; border-top: 1px solid #E3E1DA;
+    font-size: 12px; color: #888780; }
+  footer code { background: #F1EFE8; padding: 1px 5px; border-radius: 4px; font-size: 11px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <span></span>
+    <a href="index.html">← 看今日榜单</a>
+  </div>
+
+  <h1>描述你想做的事</h1>
+  <div class="sub">用中文说人话就行，比如「把长视频切成短视频」。下面会列出 GitHub 上现成的仓库。</div>
+
+  <div class="searchbar">
+    <input id="q" type="text" placeholder="我想……" autocomplete="off" spellcheck="false">
+    <button id="go">搜索</button>
+  </div>
+
+  <div class="chips" id="chips"></div>
+
+  <div class="opts">
+    <label>排序
+      <select id="sort">
+        <option value="">相关度</option>
+        <option value="stars">星标数</option>
+        <option value="updated">最近更新</option>
+      </select>
+    </label>
+    <label>最低星数
+      <select id="min">
+        <option value="20">20</option>
+        <option value="100" selected>100</option>
+        <option value="1000">1000</option>
+      </select>
+    </label>
+  </div>
+
+  <div class="terms" id="terms"></div>
+  <div id="out"></div>
+
+  <footer>
+    直接调用 GitHub 官方搜索接口，不经过任何服务器。检索词由本页内置的中英映射表生成，
+    想加词改 <code>search.html</code> 里的 <code>DICT</code>。
+    未登录时接口每分钟限 10 次，点太快会被拦一下，等一分钟即可。
+  </footer>
+</div>
+
+<script>
+const DICT = {
+  "下载视频": ["video downloader", "yt-dlp"],
+  "视频下载": ["video downloader"],
+  "下载音乐": ["music downloader"],
+  "剪辑": ["video editor"],
+  "剪成短视频": ["video editor", "ffmpeg"],
+  "转格式": ["ffmpeg", "file converter"],
+  "压缩视频": ["video compress"],
+  "提取音频": ["audio extract"],
+  "字幕": ["subtitle", "whisper"],
+  "语音转文字": ["speech to text", "whisper"],
+  "语音转成文字": ["speech to text", "whisper"],
+  "转成文字": ["speech to text", "transcription"],
+  "语音识别": ["speech recognition", "whisper"],
+  "文字转语音": ["text to speech"],
+  "抠图": ["background removal"],
+  "去背景": ["background removal"],
+  "图片压缩": ["image compress"],
+  "图片编辑": ["image editor"],
+  "批量重命名": ["batch rename"],
+  "批量改名": ["batch rename"],
+  "识别文字": ["ocr"],
+  "截图": ["screenshot"],
+  "生成图片": ["image generation", "stable diffusion"],
+  "去除水印": ["watermark removal"],
+  "pdf": ["pdf"],
+  "提取表格": ["pdf table extract", "table extraction"],
+  "表格": ["spreadsheet", "excel"],
+  "excel": ["excel"],
+  "word": ["docx"],
+  "ppt": ["pptx", "powerpoint"],
+  "文档转换": ["document converter"],
+  "合并文件": ["merge files"],
+  "简历": ["resume"],
+  "笔记": ["note taking", "markdown editor"],
+  "知识库": ["knowledge base", "wiki"],
+  "文档问答": ["document qa", "rag"],
+  "爬虫": ["crawler", "scraper"],
+  "抓取网页": ["scraper", "scraping"],
+  "抓数据": ["scraping", "api client"],
+  "数据可视化": ["data visualization"],
+  "图表": ["chart"],
+  "数据分析": ["data analysis"],
+  "数据库": ["database"],
+  "网站": ["website", "static site"],
+  "博客": ["blog"],
+  "后台": ["admin dashboard"],
+  "登录": ["authentication"],
+  "部署": ["deploy", "self-hosted"],
+  "聊天机器人": ["chatbot"],
+  "机器人": ["bot", "chatbot"],
+  "自动回复": ["auto reply", "chatbot"],
+  "微信": ["wechat"],
+  "飞书": ["feishu", "lark"],
+  "钉钉": ["dingtalk"],
+  "大模型": ["llm"],
+  "提示词": ["prompt"],
+  "智能体": ["ai-agents"],
+  "微调": ["fine-tune"],
+  "本地运行": ["ollama", "local llm"],
+  "向量": ["vector database"],
+  "知识图谱": ["knowledge graph"],
+  "代码库": ["codebase", "code intelligence"],
+  "读代码": ["codebase"],
+  "代码审查": ["code review"],
+  "问答": ["question answering", "rag"],
+  "定时任务": ["scheduler", "cron"],
+  "定时": ["scheduler", "cron"],
+  "自动化": ["automation", "workflow"],
+  "工作流": ["workflow engine"],
+  "通知": ["notification"],
+  "监控": ["monitor", "uptime"],
+  "备份": ["backup"],
+  "同步": ["sync"],
+  "云盘": ["cloud storage"],
+  "文件管理": ["file manager"],
+  "搜索": ["search engine"],
+  "聊天": ["chat"],
+  "下载": ["downloader"],
+  "邮件": ["email"],
+  "日历": ["calendar"],
+  "记账": ["finance", "bookkeeping"],
+  "股票": ["stock", "market data"],
+  "天气": ["weather"],
+  "清理": ["cleaner"],
+  "密码": ["password manager"],
+  "加密": ["encryption"],
+  "压缩文件": ["archive", "compression"],
+  "翻译": ["translation"],
+  "mcp": ["mcp-server"],
+  "skill": ["claude-skills"],
+  "捷径": ["shortcut", "automation"],
+  "小工具": ["cli tool", "utility"]
+};
+
+const STOP_ZH = ["我想", "我想要", "帮我", "能不能", "可以", "做一个", "一个", "这个", "那个",
+  "程序", "软件", "工具", "脚本", "功能", "实现", "怎么", "如何", "有没有", "什么", "并且",
+  "然后", "能够", "需要", "支持", "的", "我", "能", "要", "把", "用", "在", "和", "或"];
+
+const COMBOS = [
+  [["提取", "表格"], ["table extraction", "pdf parser"]],
+  [["抓", "数据"], ["scraper", "api client"]],
+  [["定时", "备份"], ["backup automation", "rclone"]],
+  [["自动", "回复"], ["chatbot", "auto reply"]],
+  [["生成", "图片"], ["image generation"]],
+  [["转成", "文字"], ["transcription", "whisper"]],
+  [["读", "代码"], ["codebase", "code intelligence"]],
+  [["总结", "文档"], ["summarization", "rag"]],
+  [["对比", "文件"], ["diff"]]
+];
+const STOP_EN = new Set(["i", "want", "to", "the", "a", "an", "and", "or", "for", "with", "my", "app",
+  "tool", "please", "need", "make", "build", "how", "can", "is", "it", "that", "this", "of"]);
+
+const EXAMPLES = [
+  "把长视频剪成短视频",
+  "批量提取 PDF 里的表格",
+  "每天自动抓取网页数据并通知我",
+  "让 AI 读我的代码库回答问题",
+  "把语音转成文字"
+];
+
+const $ = id => document.getElementById(id);
+
+function buildTerms(text) {
+  const lower = text.toLowerCase();
+  const hits = new Set();
+  let rest = lower;
+  Object.keys(DICT)
+    .sort((a, b) => b.length - a.length)
+    .forEach(key => {
+      if (rest.includes(key)) {
+        DICT[key].forEach(t => hits.add(t));
+        rest = rest.split(key).join(" ");
+      }
+    });
+  (rest.match(/[a-z][a-z0-9.+_-]{1,}/g) || []).forEach(w => {
+    if (!STOP_EN.has(w)) hits.add(w);
+  });
+  COMBOS.forEach(pair => {
+    if (pair[0].every(word => lower.includes(word))) pair[1].forEach(t => hits.add(t));
+  });
+  return Array.from(hits).slice(0, 4);
+}
+
+function cleanZh(text) {
+  let t = text;
+  STOP_ZH.forEach(w => { t = t.split(w).join(" "); });
+  return t.replace(/\s+/g, " ").trim();
+}
+
+function cardHtml(r) {
+  const topics = (r.topics || []).slice(0, 3)
+    .map(t => '<span class="tag">#' + esc(t) + '</span>').join("");
+  const desc = r.description ? esc(r.description) : '<span class="dim">（这个项目没写简介）</span>';
+  const meta = [r.language || "—", human(r.stargazers_count) + " stars",
+    "更新于 " + (r.pushed_at || "").slice(0, 10)].join(" · ");
+  const badge = r._hot ? '<span class="bdg">近期活跃</span>' : "";
+  return '<a class="card" href="' + esc(r.html_url) + '" target="_blank" rel="noopener">' +
+    '<div class="row"><span class="name">' + esc(r.full_name) + '</span>' + badge + '</div>' +
+    '<div class="desc">' + desc + '</div>' +
+    '<div class="meta">' + meta + '</div>' +
+    '<div class="tags">' + topics + '</div></a>';
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function human(n) {
+  return n >= 1000 ? (n / 1000).toFixed(1).replace(".0", "") + "k" : String(n);
+}
+
+async function fetchTerm(term, sort, minStars, rank) {
+  const q = term + " stars:>" + minStars;
+  let url = "https://api.github.com/search/repositories?q=" + encodeURIComponent(q) +
+    "&per_page=8";
+  if (sort === "stars") url += "&sort=stars&order=desc";
+  if (sort === "updated") url += "&sort=updated&order=desc";
+  const resp = await fetch(url, { headers: { Accept: "application/vnd.github+json" } });
+  if (resp.status === 403 || resp.status === 429) throw new Error("RATE");
+  if (!resp.ok) throw new Error("HTTP " + resp.status);
+  const data = await resp.json();
+  return (data.items || []).map((r, i) => Object.assign(r, { _rank: rank * 10 + i }));
+}
+
+async function run() {
+  const text = $("q").value.trim();
+  if (!text) { $("q").focus(); return; }
+
+  const out = $("out"), termsBox = $("terms"), btn = $("go");
+  const sort = $("sort").value, minStars = $("min").value;
+
+  let terms = buildTerms(text);
+  if (!terms.length) {
+    const zh = cleanZh(text);
+    terms = zh ? [zh] : [text];
+  }
+  termsBox.textContent = "检索词：" + terms.join("　·　");
+
+  btn.disabled = true;
+  out.innerHTML = '<div class="status">正在搜索…</div>';
+
+  try {
+    const batches = await Promise.all(
+      terms.map((t, i) => fetchTerm(t, sort, minStars, i).catch(() => []))
+    );
+    const merged = new Map();
+    batches.flat().forEach(r => {
+      const old = merged.get(r.full_name);
+      if (!old || r._rank < old._rank) merged.set(r.full_name, r);
+    });
+
+    let list = Array.from(merged.values());
+    const now = Date.now();
+    list.forEach(r => {
+      r._hot = (now - new Date(r.pushed_at).getTime()) < 30 * 864e5;
+    });
+
+    if (sort === "stars") list.sort((a, b) => b.stargazers_count - a.stargazers_count);
+    else if (sort === "updated") list.sort((a, b) => new Date(b.pushed_at) - new Date(a.pushed_at));
+    else list.sort((a, b) => a._rank - b._rank);
+
+    list = list.slice(0, 20);
+
+    if (!list.length) {
+      out.innerHTML = '<div class="empty">没搜到。换个说法，或者把「最低星数」调低一点。<br>' +
+        'GitHub 上大部分仓库的简介是英文，用中文搜到的会比英文少。</div>';
+    } else {
+      out.innerHTML = '<div class="status">找到 ' + list.length + ' 个，按' +
+        ({ "": "相关度", stars: "星标数", updated: "更新时间" }[sort]) + '排序</div>' +
+        list.map(cardHtml).join("");
+    }
+  } catch (e) {
+    if (e.message === "RATE") {
+      out.innerHTML = '<div class="status err">GitHub 接口限流了（未登录每分钟 10 次）。' +
+        '等一分钟再点一次就好。</div>';
+    } else {
+      out.innerHTML = '<div class="status err">连不上 GitHub 接口（' + esc(e.message) +
+        '）。检查一下网络，或者过一会儿再试。</div>';
+    }
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+EXAMPLES.forEach(t => {
+  const b = document.createElement("button");
+  b.className = "chip";
+  b.textContent = t;
+  b.onclick = () => { $("q").value = t; run(); };
+  $("chips").appendChild(b);
+});
+
+$("go").onclick = run;
+$("q").addEventListener("keydown", e => { if (e.key === "Enter") run(); });
+$("sort").onchange = () => { if ($("q").value.trim()) run(); };
+
+const preset = new URLSearchParams(location.search).get("q");
+if (preset) { $("q").value = preset; run(); }
+</script>
+</body>
+</html>

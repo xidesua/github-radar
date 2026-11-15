@@ -1,0 +1,22 @@
+{
+  "_说明": "这是你唯一需要改的文件。改完保存，明天跑出来的结果就按新关键词筛选。",
+  "keywords": {
+    "AI 与智能体": ["agent", "llm", "gpt", "claude", "gemini", "rag", "mcp", "prompt", "fine-tune", "inference", "embedding", "copilot"],
+    "能力提升": ["awesome", "roadmap", "tutorial", "learning", "course", "handbook", "guide", "cheatsheet", "interview", "from-scratch"],
+    "效率工具": ["automation", "workflow", "cli", "productivity", "obsidian", "notion", "knowledge", "scraping", "crawler", "browser"],
+    "数据与分析": ["dataframe", "analytics", "visualization", "dashboard", "sql", "etl", "pandas"]
+  },
+  "queries": [
+    { "label": "近七天冒头的新项目", "q": "created:>{7d} stars:>30", "sort": "stars" },
+    { "label": "AI 智能体", "q": "topic:ai-agents stars:>300", "sort": "stars" },
+    { "label": "LLM 工具生态", "q": "topic:llm stars:>1200", "sort": "stars" },
+    { "label": "MCP 与技能生态", "q": "topic:mcp-server stars:>40", "sort": "stars" },
+    { "label": "值得读的学习资源", "q": "topic:awesome stars:>2000", "sort": "stars" }
+  ],
+  "per_query": 30,
+  "min_stars": 30,
+  "language_hint": "任何语言",
+  "top_gainers": 8,
+  "top_relevant": 10,
+  "top_new": 6
+}
