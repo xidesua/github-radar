@@ -1,58 +1,83 @@
 # GitHub 情报站
 
-每天扫一遍 GitHub，挑出三样东西给你：**今天涨得最快的**、**跟你关注方向相关的**、**最近冒出来的新项目**。生成一个网页 + 一份文本日报。
+每天扫一遍 GitHub，挑出三样东西：**今天涨得最快的**、**跟你关注方向相关的**、**最近冒出来的新项目**。生成一个网页 + 一份文本日报。
 
-不用懂代码，只用知道两件事：看哪个文件、改哪个文件。
+- 打开就用：`site/index.html`
+- 有个想做的事？`site/search.html` 里用中文描述，它去找对应的开源库
+- 想每天自动更新、电脑关机也照跑？推到 GitHub，用 Actions + Pages（下面有步骤）
 
 ---
 
-## 现在就能看
+## 两个版本
 
-双击 `site/index.html`，浏览器打开就是今天的榜单。桌面上有个「GitHub 情报站」快捷方式，直接点它。
-
-想要纯文字版，看 `digest.md`。
-
-## 有个想做的事？搜一下
-
-点首页上方的「我有想做的事，帮我找工具 →」，或者直接开 `site/search.html`。
-
-左边输入中文，比如「把长视频剪成短视频」，它会：
-
-1. 把中文意图翻成英文检索词（`video editor`、`ffmpeg`）
-2. 拿去 GitHub 官方搜索接口查
-3. 按星标 / 更新时间 / 相关度排序，列出还能用的仓库
-
-页面上会显示它实际用了哪些检索词 —— 搜得不准时，你就知道该换个说法了。
-
-映射表在 `search.html` 里的 `DICT`（87 个中文说法），`COMBOS` 处理「提取+表格」这种拆开的组合。想加词直接往里加。
-
-搜索是**纯前端**的，页面直接调 GitHub 接口，没有中间服务器。代价是未登录时每分钟只能查 10 次，点太密会被拦一下。
-
-## 想每天自动更新，两种方式
-
-### 方式一：留在自己电脑上（最省事）
-
-```
-python scripts/collect.py
-```
-
-想每天自动跑，告诉我，我给你挂一个每天早上的定时任务。
-
-### 方式二：扔到 GitHub 上跑（电脑关机也照跑）
+| 版本 | git 标签 | 多出来的东西 | 怎么打开 |
+| --- | --- | --- | --- |
+| **V1 网页版** | `v1.0.0` | 每日榜单 + 中文搜索页 | 双击 `site/index.html` |
+| **V2 桌面版** | `v2.0.0` | 原生窗口、开机自启、应用图标 | 开机自动出现 |
 
 ```bash
-cd ai-radar
-git init -b main && git add . && git commit -m "init"
+git checkout v1.0.0    # 回到纯网页版
+git checkout v2.0.0    # 回到桌面版
+```
+
+细节见 [`CHANGELOG.md`](CHANGELOG.md)。
+
+## 目录
+
+```
+ai-radar/
+├─ config.json               # 你唯一需要改的：关键词、抓取范围
+├─ scripts/collect.py        # 抓取 + 打分 + 生成页面（纯标准库）
+├─ scripts/publish.py        # 一条命令发布到你的 GitHub
+├─ data/history.json         # star 快照，算涨幅用
+├─ site/index.html           # 网页版日报（自动生成）
+├─ site/search.html          # 搜索页：中文描述 → 找对应仓库
+├─ digest.md                 # 文字版日报（自动生成）
+├─ app/open_app.py           # V2：pywebview 原生窗口
+├─ app/server.py             # V2：本地静态服务 127.0.0.1:8801
+└─ .github/workflows/daily.yml   # 每天定时跑
+```
+
+## 本地跑
+
+```bash
+python scripts/collect.py      # 抓一次，更新页面和日报
+python app/open_app.py         # V2：开桌面窗口（会自动拉起本地服务）
+python app/open_app.py --check # 只打印窗口位置和服务状态，不开窗
+```
+
+不需要 `pip install`，只用 Python 标准库。桌面窗口额外需要 `pywebview`。
+
+## 发布到 GitHub
+
+### 一条命令
+
+```bash
+export GH_TOKEN=ghp_你的token          # PowerShell: $env:GH_TOKEN="ghp_..."
+python scripts/publish.py ai-radar     # 最后一个是仓库名
+```
+
+脚本会：建仓库（已存在就复用）→ 配好 remote → 推送 → 给你 Pages 设置链接。token 只在内存里用一次，不写进 `.git/config`。
+
+token 去 [Settings → Tokens](https://github.com/settings/tokens) 建，勾 `repo` 就行。
+
+### 或者手动
+
+```bash
 git remote add origin https://github.com/<你的用户名>/<仓库名>.git
 git push -u origin main
 ```
 
-然后去仓库 **Settings → Pages → Source 选 `GitHub Actions`**。
+推完**必须**做这一步，否则部署会失败（第一次用的人一半栽在这）：
 
-之后每天北京时间 9:00，它会自己抓、自己生成、自己发布到
-`https://<你的用户名>.github.io/<仓库名>/`。手机上收藏这个链接就能每天看。
+> 仓库 → **Settings → Pages → Source 选 `GitHub Actions`** → Save
 
-## 想调口味，只改一个文件
+之后每天北京时间 9:00，它自己抓、自己生成、自己发布到
+`https://<你的用户名>.github.io/<仓库名>/`。手机上收藏就能每天看。
+
+**注意**：Pages 对公开仓库免费，私有仓库要 Pro。这个仓库的内容都是公开的 GitHub 数据，设成公开没风险，只是 `config.json` 里的关注词会被人看到。
+
+## 调口味
 
 打开 `config.json`：
 
@@ -63,31 +88,22 @@ git push -u origin main
 }
 ```
 
-- 觉得太少 → 加词
-- 觉得跑偏 → 删词
-- 想加个新方向 → 照格式加一行
+- 太少 → 加词
+- 跑偏 → 删词
+- 新方向 → 照格式加一行
 
-`queries` 那段决定「去哪儿捞」，不是必须动的。
+`queries` 那段决定「去哪儿捞」，一般不用动。
 
-## 三件事你需要知道
+## 三件需要知道的事
 
-1. **今天这一栏是折算值。** 第一次跑没有历史数据可比，所以「近期最猛」用的是「上线以来日均涨星」。从明天起会变成真实的 24 小时涨幅 —— 那才是真的有人在投票。
-2. **简介是英文的。** 我没有在这里接翻译，因为多一层就多一个会挂的地方。看不懂名字就先点进去，GitHub 页面右上角有自动翻译。
-3. **GitHub 只是一个信号源。** 它反映的是「程序员正在关注什么」，不等于「什么对你有用」。真要提升能力，看完还得动手用一个。
+1. **第一次跑没有涨幅数据。** 没有历史快照时，「今日涨星最快」用的是「上线以来日均涨星」，页面上会写明。第二天起才是真实的 24 小时涨幅。
+2. **简介是英文的。** 没接翻译——多一层就多一个会挂的地方。看不懂就先点进去，GitHub 页面右上角有自动翻译。
+3. **GitHub 只是一个信号源。** 它反映「程序员在关注什么」，不等于「什么对你有用」。
 
-## 技术说明（可以跳过）
+## 技术说明
 
-- 只用 Python 标准库，不需要 `pip install`。
-- 走 GitHub 官方 API（`/search/repositories`），不爬网页。网页那份在国内经常连不上，API 稳定得多。
-- 未登录时搜索接口限 10 次/分钟，脚本内置了间隔；在 Actions 里带 token 是 30 次/分钟。
-- 历史快照存在 `data/history.json`，用来算涨幅。
-
-| 文件 | 作用 |
-| --- | --- |
-| `config.json` | 你唯一需要改的：关键词、抓取范围 |
-| `scripts/collect.py` | 抓取 + 打分 + 生成页面 |
-| `data/history.json` | 每天的 star 快照，算涨幅用 |
-| `site/index.html` | 网页版日报（自动生成） |
-| `site/search.html` | 搜索页：中文描述 → 找对应仓库 |
-| `digest.md` | 文字版日报（自动生成） |
-| `.github/workflows/daily.yml` | 每天定时跑的配置 |
+- 走 GitHub 官方 API，不爬网页。网页版在国内经常连不上，API 稳定得多。
+- 未登录搜索接口限 10 次/分钟，脚本内置间隔；Actions 里带 token 是 30 次/分钟。
+- 抓到的榜单里混着批量注册的仿冒仓库（简介一字不差），按简介指纹去重。
+- 构建与部署写在同一个 workflow 文件的两个 job 里：`GITHUB_TOKEN` 产生的提交不会触发其他工作流，拆成两个文件的话定时任务永远触发不到部署。
+- 仓库 60 天没有活动，定时任务会被 GitHub 自动暂停——偶尔推一次东西就能续上。
