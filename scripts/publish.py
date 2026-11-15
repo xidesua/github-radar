@@ -138,6 +138,30 @@ def push(remote_url: str, branch: str, token: str) -> None:
 
 # ---------- 主流程 ----------
 
+def enable_pages(owner: str, repo: str, token: str) -> str:
+    """把 Pages 设成「GitHub Actions」来源。已存在就改，不存在的建。"""
+    status, info = api("POST", f"/repos/{owner}/{repo}/pages", token, {"build_type": "workflow"})
+    if status in (201, 204):
+        return "已开启（来源 GitHub Actions）"
+    if status == 409:
+        status2, info2 = api("PUT", f"/repos/{owner}/{repo}/pages", token, {"build_type": "workflow"})
+        if status2 in (200, 204):
+            return "已存在，已改为 GitHub Actions 来源"
+        return f"已存在，但改来源失败（HTTP {status2}）：{info2.get('message', '')[:120]}"
+    return f"开启失败（HTTP {status}）：{info.get('message', '')[:120]}"
+
+
+def trigger(owner: str, repo: str, token: str, branch: str) -> str:
+    """手动触发一次工作流，省得等第二天 9 点。"""
+    status, info = api(
+        "POST", f"/repos/{owner}/{repo}/actions/workflows/daily.yml/dispatches", token,
+        {"ref": branch},
+    )
+    if status in (204, 200):
+        return "已触发第一次运行，约 1 分钟后出页面"
+    return f"触发失败（HTTP {status}）：{info.get('message', '')[:120]}"
+
+
 def main() -> int:
     args = [a for a in sys.argv[1:] if not a.startswith("-")]
     flags = {a for a in sys.argv[1:] if a.startswith("-")}
@@ -217,20 +241,21 @@ def main() -> int:
     git(["remote", "remove", "origin"], check=False)
     git(["remote", "add", "origin", remote_url], check=False)
 
-    pages_on = bool(info.get("has_pages"))
+    owner, name = full.split("/", 1)
+    print("配置 Pages …")
+    print("  " + enable_pages(owner, name, token))
+    print("触发第一次运行 …")
+    print("  " + trigger(owner, name, token, branch))
+
     print()
     print("=" * 58)
     print(f"仓库      : {info['html_url']}")
     print(f"Actions   : {info['html_url']}/actions")
     print(f"Pages 设置: {info['html_url']}/settings/pages")
-    if pages_on:
-        print(f"网址      : https://{login}.github.io/{repo}/")
-    else:
-        print()
-        print("最后一步（必须做）：")
-        print("  上面 Pages 设置页 → Source 选「GitHub Actions」→ Save")
-        print(f"  然后到 Actions 页手动跑一次，网址就是 https://{login}.github.io/{repo}/")
+    print(f"网址      : https://{login}.github.io/{name}/")
     print("=" * 58)
+    print("第一次跑完（约 1 分钟）网址就能打开。")
+    print(f"如果 Pages 那行报错，手动去 {info['html_url']}/settings/pages 把 Source 改成 GitHub Actions。")
     return 0
 
 
