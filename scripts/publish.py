@@ -3,7 +3,11 @@
 
 用法：
     export GH_TOKEN=ghp_xxxx            # PowerShell: $env:GH_TOKEN="ghp_xxxx"
-    python scripts/publish.py ai-radar
+    python scripts/publish.py github-radar
+
+    不想把 token 打进命令里，就把它存到文件（更安全）：
+        C:/Users/<你>/.gh_token        文件里只放 token 这一行
+    脚本会自动去读，读到就不需要环境变量。
 
 做的事：
     1. 用 token 查出你的用户名
@@ -137,18 +141,31 @@ def push(remote_url: str, branch: str, token: str) -> None:
 def main() -> int:
     args = [a for a in sys.argv[1:] if not a.startswith("-")]
     flags = {a for a in sys.argv[1:] if a.startswith("-")}
-    repo = args[0] if args else "ai-radar"
+    repo = args[0] if args else "github-radar"
     private = "--private" in flags
     dry = "--dry-run" in flags
 
     token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN") or ""
     if not token:
+        for name in (".gh_token", ".ai-radar-token", ".github_token"):
+            f = Path.home() / name
+            if f.is_file():
+                token = f.read_text(encoding="utf-8", errors="replace").strip().splitlines()[0].strip()
+                if token:
+                    print(f"token 来源：{f}")
+                    break
+    if not token:
         print("缺少 token。\n")
-        print("  1. 打开 https://github.com/settings/tokens → Generate new token (classic)")
-        print("  2. 勾选 repo 这一项，生成后复制（只显示一次）")
-        print("  3. 回来执行：")
-        print('       export GH_TOKEN=ghp_xxxx        # PowerShell: $env:GH_TOKEN="ghp_xxxx"')
-        print(f"       python scripts/publish.py {repo}")
+        print("  方式一：把 token 存成文件（不用发给任何人）")
+        print(f"    用记事本新建 {Path.home() / '.gh_token'}，里面只粘贴 token 那一行，保存")
+        print(f"    然后执行：python scripts/publish.py {repo}")
+        print()
+        print("  方式二：临时环境变量")
+        print('    export GH_TOKEN=ghp_xxxx        # PowerShell: $env:GH_TOKEN="ghp_xxxx"')
+        print(f"    python scripts/publish.py {repo}")
+        print()
+        print("  建 token：https://github.com/settings/tokens/new?scopes=repo&description=github-radar")
+        print("  勾 repo 这一项即可，有效期随意。推送完成后建议删掉这个 token。")
         return 1
 
     status, me = api("GET", "/user", token)

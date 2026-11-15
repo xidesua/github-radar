@@ -54,12 +54,13 @@ python app/open_app.py --check # 只打印窗口位置和服务状态，不开�
 
 ```bash
 export GH_TOKEN=ghp_你的token          # PowerShell: $env:GH_TOKEN="ghp_..."
-python scripts/publish.py ai-radar     # 最后一个是仓库名
+python scripts/publish.py github-radar   # 最后一个是仓库名
 ```
 
 脚本会：建仓库（已存在就复用）→ 配好 remote → 推送 → 给你 Pages 设置链接。token 只在内存里用一次，不写进 `.git/config`。
 
-token 去 [Settings → Tokens](https://github.com/settings/tokens) 建，勾 `repo` 就行。
+token 去 [Settings → Tokens](https://github.com/settings/tokens/new?scopes=repo) 建，勾 `repo` 就行。
+不想把 token 打进命令，就存到 `C:/Users/<你>/.gh_token`（文件里只放 token 一行），脚本会自动读。
 
 ### 或者手动
 
