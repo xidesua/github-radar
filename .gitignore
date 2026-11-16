@@ -10,3 +10,6 @@ app/boot.log
 app/server.log
 app/.edge-profile/
 _ca.pem
+
+# 打包产物（上传到 Release，不进仓库）
+dist/
