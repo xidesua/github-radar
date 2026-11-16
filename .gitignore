@@ -1,2 +1,12 @@
+# Python
+__pycache__/
+*.pyc
+
+# 工作区记忆（automation 的 cwd 会在这里生成，不该进公开仓库）
+.workbuddy/
+
+# 本机运行时产物
 app/boot.log
 app/server.log
+app/.edge-profile/
+_ca.pem
