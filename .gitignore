@@ -1,5 +1,2 @@
-__pycache__/
-*.pyc
-app/.edge-profile/
-_ca.pem
+.workbuddy/
 app/boot.log
