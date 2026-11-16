@@ -8,12 +8,29 @@
 import os
 import sys
 import threading
+import time
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 PORT = 8801
 SITE = Path(__file__).resolve().parent.parent / "site"
+LOG = Path(__file__).resolve().parent / "server.log"
+
+
+def say(msg):
+    """pythonw 下 sys.stdout 是 None，直接 print 会崩，所以统一走这里。"""
+    line = f"{time.strftime('%m-%d %H:%M:%S')} {msg}"
+    try:
+        if sys.stdout is not None:
+            print(line, flush=True)
+    except Exception:
+        pass
+    try:
+        with open(LOG, "a", encoding="utf-8") as f:
+            f.write(line + "\n")
+    except Exception:
+        pass
 
 
 class Quiet(SimpleHTTPRequestHandler):
@@ -36,15 +53,15 @@ def already_running():
 
 def main():
     if not SITE.is_dir():
-        print(f"找不到目录：{SITE}")
+        say(f"找不到目录：{SITE}")
         return 1
     if already_running():
-        print(f"端口 {PORT} 已在服务，跳过")
+        say(f"端口 {PORT} 已在服务，跳过")
         return 0
 
     handler = partial(Quiet, directory=str(SITE))
     httpd = ThreadingHTTPServer(("127.0.0.1", PORT), handler)
-    print(f"serving {SITE} on http://127.0.0.1:{PORT}")
+    say(f"serving {SITE} on http://127.0.0.1:{PORT}")
     thread = threading.Thread(target=httpd.serve_forever, daemon=True)
     thread.start()
     try:
@@ -55,4 +72,11 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except SystemExit:
+        raise
+    except Exception:
+        import traceback
+
+        say("服务异常:\n" + traceback.format_exc())
