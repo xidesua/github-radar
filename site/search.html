@@ -47,6 +47,7 @@
   .tag { font-size: 11px; color: #5F5E5A; background: #F1EFE8; border-radius: 4px; padding: 1px 6px; }
   .bdg { font-size: 11px; border-radius: 4px; padding: 1px 6px; background: #FCEBEB; color: #A32D2D;
     font-variant-numeric: tabular-nums; }
+  .bdg.rd { background: #E8F1FB; color: #185FA5; }
   .empty { background: #fff; border: 1px dashed #D3D1C7; border-radius: 12px; padding: 28px;
     text-align: center; color: #5F5E5A; font-size: 13px; }
   footer { margin-top: 44px; padding-top: 20px; border-top: 1px solid #E3E1DA;
@@ -92,8 +93,10 @@
   <div id="out"></div>
 
   <footer>
-    直接调用 GitHub 官方搜索接口，不经过任何服务器。检索词由本页内置的中英映射表生成，
-    想加词改 <code>search.html</code> 里的 <code>DICT</code>。
+    直接调用 GitHub 官方搜索接口，不经过任何服务器。每次搜索会发多路查询：
+    前几个检索词搜「名称 / 简介 / 话题」，前两个还会再搜一遍 <code>README 正文</code>——
+    这是专门用来找"简介没写关键词"的项目的，结果上会标蓝。检索词由内置的中英映射表 +
+    同义词表生成，想加词改 <code>search.html</code> 里的 <code>DICT</code> 和 <code>SYN</code>。
     未登录时接口每分钟限 10 次，点太快会被拦一下，等一分钟即可。
   </footer>
 </div>
@@ -173,7 +176,8 @@ const DICT = {
   "监控": ["monitor", "uptime"],
   "备份": ["backup"],
   "同步": ["sync"],
-  "云盘": ["cloud storage"],
+  "云盘": ["cloud storage", "cloud drive"],
+  "网盘": ["netdisk", "alist", "cloud drive"],
   "文件管理": ["file manager"],
   "搜索": ["search engine"],
   "聊天": ["chat"],
@@ -199,6 +203,9 @@ const STOP_ZH = ["我想", "我想要", "帮我", "能不能", "可以", "做一
   "然后", "能够", "需要", "支持", "的", "我", "能", "要", "把", "用", "在", "和", "或"];
 
 const COMBOS = [
+  [["无限", "网盘"], ["alist", "cloudreve", "nextcloud", "webdav"]],
+  [["私人", "网盘"], ["alist", "nextcloud", "self-hosted"]],
+  [["自建", "网盘"], ["alist", "nextcloud", "cloudreve"]],
   [["提取", "表格"], ["table extraction", "pdf parser"]],
   [["抓", "数据"], ["scraper", "api client"]],
   [["定时", "备份"], ["backup automation", "rclone"]],
@@ -212,12 +219,49 @@ const COMBOS = [
 const STOP_EN = new Set(["i", "want", "to", "the", "a", "an", "and", "or", "for", "with", "my", "app",
   "tool", "please", "need", "make", "build", "how", "can", "is", "it", "that", "this", "of"]);
 
+// 同义词扩展：命中左边任一词，就自动补搜右边的近义词。
+// 解决"简介用词和你想的不一样"的问题——搜 cloud storage 也能找到叫 netdisk / alist 的项目。
+const SYN = {
+  "cloud storage": ["cloud drive", "netdisk", "webdav"],
+  "cloud drive": ["netdisk", "alist", "webdav"],
+  "netdisk": ["alist", "cloudreve", "nextcloud"],
+  "webdav": ["cloud drive", "alist"],
+  "downloader": ["download manager", "yt-dlp"],
+  "video downloader": ["yt-dlp", "video download"],
+  "video editor": ["video editing", "ffmpeg"],
+  "scraper": ["crawler", "spider"],
+  "scraping": ["scraper", "crawler"],
+  "crawler": ["scraper", "spider"],
+  "backup": ["rclone", "backup tool"],
+  "ocr": ["text recognition", "tesseract"],
+  "subtitle": ["subtitles", "whisper"],
+  "whisper": ["speech recognition", "transcription"],
+  "transcription": ["whisper", "speech recognition"],
+  "llm": ["large language model", "ai agents"],
+  "ai-agents": ["agent framework", "llm agent"],
+  "rag": ["retrieval augmented", "document qa"],
+  "chatbot": ["chat assistant", "ai chat"],
+  "note taking": ["notes app", "knowledge base"],
+  "scheduler": ["cron", "task scheduler"],
+  "automation": ["workflow", "rpa"],
+  "workflow": ["automation", "workflow engine"],
+  "monitor": ["uptime monitor", "status page"],
+  "password manager": ["password vault", "keeweb"],
+  "image generation": ["text to image", "stable diffusion"],
+  "speech to text": ["whisper", "transcription"],
+  "file manager": ["file explorer", "webdav"],
+  "self-hosted": ["docker", "homelab"],
+  "codebase": ["code intelligence", "code context"],
+  "table extraction": ["pdf parser", "camelot"],
+  "notification": ["push notification", "message push"]
+};
+
 const EXAMPLES = [
   "把长视频剪成短视频",
   "批量提取 PDF 里的表格",
+  "我要那种无限网盘的那种项目",
   "每天自动抓取网页数据并通知我",
-  "让 AI 读我的代码库回答问题",
-  "把语音转成文字"
+  "让 AI 读我的代码库回答问题"
 ];
 
 const $ = id => document.getElementById(id);
@@ -240,7 +284,9 @@ function buildTerms(text) {
   COMBOS.forEach(pair => {
     if (pair[0].every(word => lower.includes(word))) pair[1].forEach(t => hits.add(t));
   });
-  return Array.from(hits).slice(0, 4);
+  // 同义词扩展一轮（不递归，防止爆炸）
+  Array.from(hits).forEach(t => (SYN[t] || []).forEach(s => hits.add(s)));
+  return Array.from(hits).slice(0, 6);
 }
 
 function cleanZh(text) {
@@ -255,7 +301,9 @@ function cardHtml(r) {
   const desc = r.description ? esc(r.description) : '<span class="dim">（这个项目没写简介）</span>';
   const meta = [r.language || "—", human(r.stargazers_count) + " stars",
     "更新于 " + (r.pushed_at || "").slice(0, 10)].join(" · ");
-  const badge = r._hot ? '<span class="bdg">近期活跃</span>' : "";
+  const badge = (r._hot ? '<span class="bdg">近期活跃</span>' : "") +
+    ((r._src || []).includes("readme") && !(r._src || []).includes("meta")
+      ? '<span class="bdg rd">简介没写 · README 里提到</span>' : "");
   return '<a class="card" href="' + esc(r.html_url) + '" target="_blank" rel="noopener">' +
     '<div class="row"><span class="name">' + esc(r.full_name) + '</span>' + badge + '</div>' +
     '<div class="desc">' + desc + '</div>' +
@@ -272,17 +320,16 @@ function human(n) {
   return n >= 1000 ? (n / 1000).toFixed(1).replace(".0", "") + "k" : String(n);
 }
 
-async function fetchTerm(term, sort, minStars, rank) {
-  const q = term + " stars:>" + minStars;
+async function fetchQuery(q, sort, rank, src) {
   let url = "https://api.github.com/search/repositories?q=" + encodeURIComponent(q) +
-    "&per_page=8";
+    "&per_page=10";
   if (sort === "stars") url += "&sort=stars&order=desc";
   if (sort === "updated") url += "&sort=updated&order=desc";
   const resp = await fetch(url, { headers: { Accept: "application/vnd.github+json" } });
   if (resp.status === 403 || resp.status === 429) throw new Error("RATE");
   if (!resp.ok) throw new Error("HTTP " + resp.status);
   const data = await resp.json();
-  return (data.items || []).map((r, i) => Object.assign(r, { _rank: rank * 10 + i }));
+  return (data.items || []).map((r, i) => Object.assign(r, { _rank: rank + i, _src: src }));
 }
 
 async function run() {
@@ -290,26 +337,48 @@ async function run() {
   if (!text) { $("q").focus(); return; }
 
   const out = $("out"), termsBox = $("terms"), btn = $("go");
-  const sort = $("sort").value, minStars = $("min").value;
+  const sort = $("sort").value, minStars = +$("min").value;
 
   let terms = buildTerms(text);
   if (!terms.length) {
     const zh = cleanZh(text);
     terms = zh ? [zh] : [text];
   }
-  termsBox.textContent = "检索词：" + terms.join("　·　");
+
+  // 两路查询：
+  // A 路（简介/名称/话题）：前 3 个检索词，不加星数过滤——星数过滤改在结果里分层，
+  //    这样一次请求能同时拿到"够热门的"和"小众但真实存在的"。
+  // B 路（README 正文）：前 2 个检索词。很多项目简介写得含糊，关键词只出现在 README 里，
+  //    这一路就是专门把它们捞回来的。带星数下限控制噪声。
+  const metaTerms = terms.slice(0, 3);
+  const readTerms = terms.slice(0, 2);
+  const jobs = [];
+  metaTerms.forEach((t, i) => jobs.push({ q: t, rank: i * 10, src: "meta", delay: i * 350 }));
+  readTerms.forEach((t, i) =>
+    jobs.push({ q: t + " in:readme stars:>=" + Math.max(minStars, 50),
+                rank: 100 + i * 10, src: "readme", delay: (metaTerms.length + i) * 350 }));
+
+  termsBox.textContent = "检索词：" + terms.join("　·　") +
+    "　｜　前 " + readTerms.length + " 个会同时搜 README 正文（简介没写关键词的项目就靠这一路找到）";
 
   btn.disabled = true;
-  out.innerHTML = '<div class="status">正在搜索…</div>';
+  out.innerHTML = '<div class="status">正在搜简介 + README，共 ' + jobs.length + ' 路查询…</div>';
 
   try {
-    const batches = await Promise.all(
-      terms.map((t, i) => fetchTerm(t, sort, minStars, i).catch(() => []))
-    );
+    const batches = await Promise.all(jobs.map(j => new Promise(res =>
+      setTimeout(() => fetchQuery(j.q, sort, j.rank, j.src)
+        .then(res).catch(e => res(j.src === "meta" && e.message === "RATE" ? null : [])), j.delay))));
+
+    if (batches.includes(null)) throw new Error("RATE");
+
     const merged = new Map();
     batches.flat().forEach(r => {
       const old = merged.get(r.full_name);
-      if (!old || r._rank < old._rank) merged.set(r.full_name, r);
+      if (!old) { r._src = [r._src]; merged.set(r.full_name, r); }
+      else {
+        old._rank = Math.min(old._rank, r._rank);
+        if (!old._src.includes(r._src)) old._src.push(r._src);
+      }
     });
 
     let list = Array.from(merged.values());
@@ -318,24 +387,40 @@ async function run() {
       r._hot = (now - new Date(r.pushed_at).getTime()) < 30 * 864e5;
     });
 
-    if (sort === "stars") list.sort((a, b) => b.stargazers_count - a.stargazers_count);
-    else if (sort === "updated") list.sort((a, b) => new Date(b.pushed_at) - new Date(a.pushed_at));
-    else list.sort((a, b) => a._rank - b._rank);
+    const bySort = a => {
+      if (sort === "stars") a.sort((x, y) => y.stargazers_count - x.stargazers_count);
+      else if (sort === "updated") a.sort((x, y) => new Date(y.pushed_at) - new Date(x.pushed_at));
+      else a.sort((x, y) => x._rank - y._rank);
+    };
+    bySort(list);
 
-    list = list.slice(0, 20);
+    const strict = list.filter(r => r.stargazers_count >= minStars);
+    const relaxed = list.filter(r => r.stargazers_count < minStars).slice(0, 6);
+
+    const main = strict.length ? strict : relaxed;
+    bySort(main);
 
     if (!list.length) {
-      out.innerHTML = '<div class="empty">没搜到。换个说法，或者把「最低星数」调低一点。<br>' +
-        'GitHub 上大部分仓库的简介是英文，用中文搜到的会比英文少。</div>';
+      out.innerHTML = '<div class="empty">简介、名称、话题和 README 正文都搜过了，没找到。<br>' +
+        '换个更具体的说法（比如直接用英文工具名：alist、whisper、rclone），<br>' +
+        '或者把「最低星数」调低一点再试。</div>';
     } else {
-      out.innerHTML = '<div class="status">找到 ' + list.length + ' 个，按' +
-        ({ "": "相关度", stars: "星标数", updated: "更新时间" }[sort]) + '排序</div>' +
-        list.map(cardHtml).join("");
+      let html = '<div class="status">找到 ' + main.length + ' 个（共 ' + list.length +
+        ' 个候选），按' + ({ "": "相关度", stars: "星标数", updated: "更新时间" }[sort]) + '排序</div>' +
+        main.map(cardHtml).join("");
+      if (strict.length && relaxed.length) {
+        html += '<div class="status">↓ 星数不到 ' + minStars + '、但确实相关的，也放这儿几个：</div>' +
+          relaxed.map(cardHtml).join("");
+      }
+      if (!strict.length && relaxed.length) {
+        html = '<div class="status">没有 ≥' + minStars + ' 星的结果，以下放宽到任意星数：</div>' + html;
+      }
+      out.innerHTML = html;
     }
   } catch (e) {
     if (e.message === "RATE") {
-      out.innerHTML = '<div class="status err">GitHub 接口限流了（未登录每分钟 10 次）。' +
-        '等一分钟再点一次就好。</div>';
+      out.innerHTML = '<div class="status err">GitHub 接口限流了（未登录每分钟 10 次，这次要发的查询比以前多）' +
+        '。等一分钟再点一次就好。</div>';
     } else {
       out.innerHTML = '<div class="status err">连不上 GitHub 接口（' + esc(e.message) +
         '）。检查一下网络，或者过一会儿再试。</div>';
