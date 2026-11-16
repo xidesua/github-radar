@@ -1,3 +1,6 @@
 * text=auto eol=lf
 *.png binary
 *.ico binary
+# Windows 批处理必须是 CRLF，否则 cmd 解析会出错
+*.bat text eol=crlf
+*.cmd text eol=crlf

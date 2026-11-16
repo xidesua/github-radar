@@ -10,14 +10,21 @@
 
 ## 两个版本
 
-| 版本 | git 标签 | 多出来的东西 | 怎么打开 |
+| 版本 | 当前标签 | 多出来的东西 | 怎么打开 |
 | --- | --- | --- | --- |
-| **V1 网页版** | `v1.0.0` | 每日榜单 + 中文搜索页 | 双击 `site/index.html` |
-| **V2 桌面版** | `v2.0.0` | 原生窗口、开机自启、应用图标 | 开机自动出现 |
+| **V1 网页版** | `v1.1.0` | 每日榜单 + 中文意图搜索（会连 README 正文一起搜） | 双击 `site/index.html`，或直接用线上网址 |
+| **V2 桌面版** | `v2.1.0` | 在网页版之上加原生窗口、开机自启、应用图标 | 双击 `app/start.bat`，或开机自动出现 |
+
+**不想装 Python、也不想 clone？直接下打好的包：**
+
+- [网页版 `v1.1.0`](https://github.com/xidesua/github-radar/releases/download/v1.1.0/github-radar-web-1.1.0.zip) — 解压后双击 `site/index.html`，零依赖
+- [桌面版 `v2.1.0`](https://github.com/xidesua/github-radar/releases/download/v2.1.0/github-radar-desktop-2.1.0.zip) — 解压后双击 `app/start.bat`（要 Python 3.10+ 和 `pip install pywebview`）
+
+全部版本：[Releases](https://github.com/xidesua/github-radar/releases)
 
 ```bash
-git checkout v1.0.0    # 回到纯网页版
-git checkout v2.0.0    # 回到桌面版
+git checkout v1.1.0    # 回到纯网页版
+git checkout v2.1.0    # 回到桌面版
 ```
 
 细节见 [`CHANGELOG.md`](CHANGELOG.md)。
@@ -35,6 +42,7 @@ ai-radar/
 ├─ digest.md                 # 文字版日报（自动生成）
 ├─ app/open_app.py           # V2：pywebview 原生窗口
 ├─ app/server.py             # V2：本地静态服务 127.0.0.1:8801
+├─ app/start.bat             # V2：双击就开窗（自动挑 pythonw）
 └─ .github/workflows/daily.yml   # 每天定时跑
 ```
 
