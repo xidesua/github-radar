@@ -2,3 +2,4 @@ __pycache__/
 *.pyc
 app/.edge-profile/
 _ca.pem
+app/boot.log

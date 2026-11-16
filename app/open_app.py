@@ -20,6 +20,29 @@ from pathlib import Path
 PORT = 8801
 HERE = Path(__file__).resolve().parent
 URL = f"http://127.0.0.1:{PORT}/index.html"
+LOG = HERE / "boot.log"
+
+LOGFILE = None
+try:  # pythonw 下 sys.stdout 是 None，print 会直接崩
+    if sys.stdout is not None:
+        LOGFILE = sys.stdout
+except Exception:
+    pass
+
+
+def say(msg):
+    """同时写控制台（若有）和 boot.log，pythonw 下也不崩。"""
+    line = f"{time.strftime('%m-%d %H:%M:%S')} {msg}"
+    if LOGFILE:
+        try:
+            print(line, flush=True)
+        except Exception:
+            pass
+    try:
+        with open(LOG, "a", encoding="utf-8") as f:
+            f.write(line + "\n")
+    except Exception:
+        pass
 
 
 def port_open(port=PORT, timeout=0.3):
@@ -70,15 +93,16 @@ def main():
     width, height, x, y = geometry()
     status = ensure_server(dry)
 
-    print(f"屏幕工作区 : {screen_size()[0]} x {screen_size()[1]}")
-    print(f"窗口       : 位置 {x},{y}  尺寸 {width}x{height}")
-    print(f"本地服务   : {status}")
+    say(f"屏幕工作区 : {screen_size()[0]} x {screen_size()[1]}")
+    say(f"窗口       : 位置 {x},{y}  尺寸 {width}x{height}")
+    say(f"本地服务   : {status}")
 
     if dry:
         return 0
     if "启动失败" in status:
-        print("本地服务没能启动，退出。")
+        say("本地服务没能启动，退出。")
         return 1
+    say("正在创建窗口…")
 
     import webview
 
@@ -91,9 +115,18 @@ def main():
         y=y,
         min_size=(340, 480),
     )
+    say("窗口已创建，进入消息循环")
     webview.start()
+    say("窗口已关闭，进程退出")
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except SystemExit:
+        raise
+    except Exception:
+        import traceback
+
+        say("启动异常:\n" + traceback.format_exc())
